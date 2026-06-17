@@ -1,0 +1,45 @@
+name: Sync Repository to Google AI Studio Context
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install google-generativeai
+
+      - name: Bundle and Upload to AI Studio
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # Script to combine files and upload using the File API
+          python -c '
+          import os, google.generativeai as genai
+          genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+          
+          content = ""
+          for root, _, files in os.walk("."):
+              if ".git" in root: continue
+              for file in files:
+                  if file.endswith((".py", ".js", ".ts", ".md")):
+                      try:
+                          with open(os.path.join(root, file), "r") as f:
+                              content += f"\n--- {file} ---\n" + f.read()
+                      except: pass
+                      
+          with open("ctx.txt", "w") as f: f.write(content)
+          file = genai.upload_file("ctx.txt")
+          print(f"Successfully synced to AI Studio. File URI: {file.uri}")
+          '
